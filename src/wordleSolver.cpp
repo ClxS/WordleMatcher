@@ -137,7 +137,7 @@ void wordler::step(GuessSession& session, WordHash guessedWord)
             const uint32_t hashLetter = reduceSlot(mutableFloatingTarget, j);
             if (letter == hashLetter)
             {
-                uiFoatingGuessMask = letter << (i * 5);
+                uiFoatingGuessMask |= letter << (i * 5);
                 setSlot(mutableFloatingTarget, 0, j);
             }
         }
