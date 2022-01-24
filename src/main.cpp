@@ -26,11 +26,16 @@ int main()
 {
     wordler::initialize("data/words.txt");
 
+    constexpr int c_iterations = 1000;
+
     int success = 0;
     int failure = 0;
+    int fastestSolve = 9999;
+    int slowestSolve = 0;
+    int totalSolveStepCount = 0;
 
     auto start = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < 100; i++)
+    for (int i = 0; i < c_iterations; i++)
     {
         wordler::WordHash uiWord = wordler::getRecommendedSeedWord();
         wordler::GuessSession session = wordler::beginGuessSession();
@@ -60,6 +65,10 @@ int main()
             success++;
         }
 
+        slowestSolve = std::max(slowestSolve, step);
+        fastestSolve = std::min(fastestSolve, step);
+        totalSolveStepCount += step;
+
         #if PRINT_STEPS
         std::cout << "Found " << wordler::decomposeWord(session.m_vWordList[0]) << " after " << step << " steps!\n";
         #endif
@@ -68,10 +77,14 @@ int main()
 
     std::cout << 
         std::format(
-            "\nSolve Average ms: {}\nSuccess Rate: {}/{}",
-            to_string_with_precision(std::chrono::duration_cast<std::chrono::microseconds>((end - start) / 100.0)),
+            "\nIterations: {}\nSolve Average ms: {}\nSuccess Rate: {}/{}\nFastest Solve: {} steps\nSlowest Solve: {} steps\nAverage Solve: {} steps",
+            c_iterations,
+            to_string_with_precision(std::chrono::duration_cast<std::chrono::microseconds>((end - start) / (double)c_iterations)),
             success,
-            failure + success);
+            failure + success,
+            fastestSolve,
+            slowestSolve,
+            to_string_with_precision(totalSolveStepCount / (double)c_iterations));
 
     return 0;
 }
