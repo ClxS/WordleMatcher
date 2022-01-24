@@ -5,21 +5,44 @@
 #include <fstream>
 #include <cstdlib>     /* srand, rand */
 #include <cassert>
+#include <bitset>
+#include <algorithm>
 
 #define VALIDATION_CHECKS 0
 
 static eastl::vector<wordler::WordHash> gs_words;
-static wordler::WordHash gs_defaultWord = wordler::composeWord("doums");
+static wordler::WordHash gs_defaultWord = wordler::composeWord("raise");
 
 constexpr char c_baseChar = 'a' - 1;
 
+constexpr uint32_t composeCharacter(char ch, int index)
+{
+    return (ch - c_baseChar) << (index * 5);
+}
+
+constexpr uint32_t reduceSlot(uint32_t in, int index)
+{
+    return ((in >> (index * 5)) & 0b11111);
+}
+
+constexpr void orSlot(uint32_t& in, uint32_t value, int index)
+{
+    in |= value << (index * 5);
+}
+
+constexpr void setSlot(uint32_t& in, uint32_t value, int index)
+{
+    in &= ~(0b11111 << (index * 5));
+    in |= value << (index * 5);
+}
+
 wordler::WordHash wordler::composeWord(const std::string& str)
 {
-    return (str[0] - c_baseChar) << (0 * 5) |
-        (str[1] - c_baseChar) << (1 * 5) |
-        (str[2] - c_baseChar) << (2 * 5) |
-        (str[3] - c_baseChar) << (3 * 5) |
-        (str[4] - c_baseChar) << (4 * 5);
+    return composeCharacter(str[0], 0) |
+        composeCharacter(str[1], 1) |
+        composeCharacter(str[2], 2) |
+        composeCharacter(str[3], 3) |
+        composeCharacter(str[4], 4);
 }
 
 constexpr char getCharacter(uint32_t hash, int index)
@@ -41,6 +64,88 @@ std::string wordler::decomposeWord(wordler::WordHash hash)
     return std::string(szLetters);
 }
 
+int32_t scoreWord(uint32_t word, uint32_t unscoreMask = 0)
+{
+    int32_t score = 0;
+    for (int i = 0; i < 5; i++)
+    {
+        if (reduceSlot(unscoreMask, i) != 0)
+        {
+            continue;
+        }
+
+        for (int j = 0; j < 5; j++)
+        {
+            if (i != j && reduceSlot(word, i) == reduceSlot(word, j))
+            {
+                score -= 30;
+            }
+        }
+
+        uint32_t letter = reduceSlot(word, i);
+        if (letter == composeCharacter('e', 0))
+        {
+            score += 10;
+        }
+
+        if (letter == composeCharacter('t', 0))
+        {
+            score += 8;
+        }
+
+        if (letter == composeCharacter('a', 0) ||
+            letter == composeCharacter('i', 0) ||
+            letter == composeCharacter('n', 0) ||
+            letter == composeCharacter('o', 0) ||
+            letter == composeCharacter('s', 0))
+        {
+            score += 6;
+        }
+
+        if (letter == composeCharacter('h', 0))
+        {
+            score += 5;
+        }
+
+        if (letter == composeCharacter('r', 0))
+        {
+            score += 5;
+        }
+
+        if (letter == composeCharacter('d', 0))
+        {
+            score += 4;
+        }
+
+        if (letter == composeCharacter('l', 0))
+        {
+            score += 4;
+        }
+
+        if (letter == composeCharacter('u', 0))
+        {
+            score += 3;
+        }
+
+        if (letter == composeCharacter('c', 0) || letter == composeCharacter('m', 0))
+        {
+            score += 3;
+        }
+
+        if (letter == composeCharacter('f', 0))
+        {
+            score += 2;
+        }
+
+        if (letter == composeCharacter('w', 0) || letter == composeCharacter('y', 0))
+        {
+            score += 3;
+        }
+    }
+
+    return score;
+}
+
 void wordler::initialize(const char* szFilePath)
 {
     std::ifstream input(szFilePath);
@@ -54,6 +159,10 @@ void wordler::initialize(const char* szFilePath)
         assert(word == line);
         #endif
     }
+
+    std::sort(gs_words.begin(), gs_words.end(), [](uint32_t a, uint32_t b) {
+        return scoreWord(a) < scoreWord(b);
+    });
 
     srand(time(NULL));
 }
@@ -84,30 +193,21 @@ wordler::GuessSession wordler::beginGuessSession()
     return session;
 }
 
-constexpr uint32_t reduceSlot(uint32_t in, int index)
-{
-    return ((in >> (index * 5)) & 0b11111);
-}
-
-constexpr void orSlot(uint32_t& in, uint32_t value, int index)
-{
-    in |= value << (index * 5);
-}
-
-constexpr void setSlot(uint32_t& in, uint32_t value, int index)
-{
-    in &= ~(0b11111 << (index * 5));
-    in |= value << (index * 5);
-}
-
 void wordler::step(GuessSession& session, WordHash guessedWord)
 {
+    bool bNewKnowns = false;
     uint32_t uiExclusionMask = 0;
     for (int i = 0; i < 5; i++)
     {
+        if (reduceSlot(session.m_uiCurrentInclusionMask, i) != 0)
+        {
+            continue;
+        }
+
         uint32_t letter = reduceSlot(guessedWord, i);
         if (reduceSlot(session.m_uiTargetWord, i) == letter)
         {
+            bNewKnowns = true;
             orSlot(session.m_uiCurrentInclusionMask, letter, i);
             orSlot(uiExclusionMask, 0b11111, i);
         }
@@ -121,11 +221,7 @@ void wordler::step(GuessSession& session, WordHash guessedWord)
     uint32_t mutableFloatingTarget = session.m_uiTargetWord;
     for (int i = 0; i < 5; i++)
     {
-        const uint32_t letter = reduceSlot(uiExclusionMask, i);
-        if (letter == 0)
-        {
-            continue;
-        }
+        const uint32_t guessLetter = reduceSlot(guessedWord, i);
 
         for (int j = 0; j < 5; j++)
         {
@@ -135,9 +231,9 @@ void wordler::step(GuessSession& session, WordHash guessedWord)
             }
 
             const uint32_t hashLetter = reduceSlot(mutableFloatingTarget, j);
-            if (letter == hashLetter)
+            if (guessLetter == hashLetter)
             {
-                uiFoatingGuessMask |= letter << (i * 5);
+                setSlot(uiFoatingGuessMask, guessLetter, i);
                 setSlot(mutableFloatingTarget, 0, j);
             }
         }
@@ -149,21 +245,20 @@ void wordler::step(GuessSession& session, WordHash guessedWord)
         session.m_vWordList.end(),
         [uiInclusionMask, uiExclusionMask, uiFoatingGuessMask](uint32_t hash)
         {
-            if ((hash & uiInclusionMask) != uiInclusionMask)
-            {
-                return true;
-            }
-
             for (int i = 0; i < 5; i++)
             {
-                if (reduceSlot(hash, i) == reduceSlot(uiExclusionMask, i))
+                uint32_t hashCell = reduceSlot(hash, i);
+                uint32_t inclusionCell = reduceSlot(uiInclusionMask, i);
+                if (inclusionCell != 0 && hashCell != inclusionCell)
                 {
                     return true;
                 }
-            }
 
-            for (int i = 0; i < 5; i++)
-            {
+                if (hashCell == reduceSlot(uiExclusionMask, i))
+                {
+                    return true;
+                }
+
                 uint32_t floatingLetter = reduceSlot(uiFoatingGuessMask, i);
                 if (floatingLetter == 0)
                 {
@@ -173,6 +268,11 @@ void wordler::step(GuessSession& session, WordHash guessedWord)
                 bool bFound = false;
                 for (int j = 0; j < 5; j++)
                 {
+                    if (reduceSlot(uiInclusionMask, j) != 0)
+                    {
+                        continue;
+                    }
+
                     uint32_t hashLetter = reduceSlot(hash, j);
                     if (hashLetter == floatingLetter)
                     {
@@ -190,5 +290,6 @@ void wordler::step(GuessSession& session, WordHash guessedWord)
 
             return false;
         });
+
     session.m_vWordList.erase(endIt, session.m_vWordList.end());
 }
