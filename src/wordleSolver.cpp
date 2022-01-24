@@ -7,6 +7,7 @@
 #include <cassert>
 #include <bitset>
 #include <algorithm>
+#include <iostream>
 
 #define VALIDATION_CHECKS 0
 
@@ -18,6 +19,11 @@ constexpr char c_baseChar = 'a' - 1;
 constexpr uint32_t composeCharacter(char ch, int index)
 {
     return (ch - c_baseChar) << (index * 5);
+}
+
+constexpr char getCharacter(uint32_t hash, int index)
+{
+    return (char)(c_baseChar + ((hash >> (index * 5)) & 0b11111));
 }
 
 constexpr uint32_t reduceSlot(uint32_t in, int index)
@@ -43,11 +49,6 @@ wordler::WordHash wordler::composeWord(const std::string& str)
         composeCharacter(str[2], 2) |
         composeCharacter(str[3], 3) |
         composeCharacter(str[4], 4);
-}
-
-constexpr char getCharacter(uint32_t hash, int index)
-{
-    return (char)(c_baseChar + ((hash >> (index * 5)) & 0b11111));
 }
 
 std::string wordler::decomposeWord(wordler::WordHash hash)
@@ -78,7 +79,7 @@ int32_t scoreWord(uint32_t word, uint32_t unscoreMask = 0)
         {
             if (i != j && reduceSlot(word, i) == reduceSlot(word, j))
             {
-                score -= 30;
+                score -= 100;
             }
         }
 
@@ -161,7 +162,7 @@ void wordler::initialize(const char* szFilePath)
     }
 
     std::sort(gs_words.begin(), gs_words.end(), [](uint32_t a, uint32_t b) {
-        return scoreWord(a) < scoreWord(b);
+        return scoreWord(a) > scoreWord(b);
     });
 
     srand(time(NULL));
@@ -175,13 +176,13 @@ wordler::WordHash wordler::pickRandomWord()
 
 wordler::WordHash wordler::getRecommendedSeedWord()
 {
-    return gs_defaultWord;
+    return gs_words[0];
 }
 
 wordler::WordHash wordler::pickRandomWord(GuessSession& session)
 {
     int iRandomIndex = rand() % session.m_vWordList.size();
-    return session.m_vWordList[iRandomIndex];
+    return session.m_vWordList[0];
 }
 
 wordler::GuessSession wordler::beginGuessSession()
