@@ -26,7 +26,8 @@ int main()
 {
     wordler::initialize("data/words.txt");
 
-    constexpr int c_iterations = 1000;
+    constexpr int c_iterations = 10000;
+    constexpr int c_successCutOff = 6;
 
     int success = 0;
     int failure = 0;
@@ -54,9 +55,14 @@ int main()
             wordler::step(session, uiWord);
             uiWord = wordler::pickRandomWord(session);
             step++;
+
+            if (uiWord == session.m_uiTargetWord)
+            {
+                break;
+            }
         }
 
-        if (step > 5)
+        if (step > c_successCutOff)
         {
             failure++;
         }

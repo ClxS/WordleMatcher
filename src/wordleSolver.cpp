@@ -12,8 +12,9 @@
 #define VALIDATION_CHECKS 0
 
 static eastl::vector<wordler::WordHash> gs_words;
-static wordler::WordHash gs_defaultWord = wordler::composeWord("raise");
+static wordler::WordHash gs_defaultWord = wordler::composeWord("irate");
 
+constexpr uint8_t c_invalid = 0b11111;
 constexpr char c_baseChar = 'a' - 1;
 
 constexpr uint32_t composeCharacter(char ch, int index)
@@ -190,7 +191,12 @@ wordler::GuessSession wordler::beginGuessSession()
     GuessSession session;
     session.m_vWordList = gs_words;
     session.m_uiTargetWord = wordler::pickRandomWord();
-    session.m_uiCurrentInclusionMask = 0;
+    session.m_uiCurrentInclusionMask =
+        c_invalid << (0 * 5) |
+        c_invalid << (1 * 5) |
+        c_invalid << (2 * 5) |
+        c_invalid << (3 * 5) |
+        c_invalid << (4 * 5);
     return session;
 }
 
@@ -200,8 +206,9 @@ void wordler::step(GuessSession& session, WordHash guessedWord)
     uint32_t uiExclusionMask = 0;
     for (int i = 0; i < 5; i++)
     {
-        if (reduceSlot(session.m_uiCurrentInclusionMask, i) != 0)
+        if (reduceSlot(session.m_uiCurrentInclusionMask, i) != c_invalid)
         {
+            orSlot(uiExclusionMask, c_invalid, i);
             continue;
         }
 
@@ -209,8 +216,8 @@ void wordler::step(GuessSession& session, WordHash guessedWord)
         if (reduceSlot(session.m_uiTargetWord, i) == letter)
         {
             bNewKnowns = true;
-            orSlot(session.m_uiCurrentInclusionMask, letter, i);
-            orSlot(uiExclusionMask, 0b11111, i);
+            setSlot(session.m_uiCurrentInclusionMask, letter, i);
+            orSlot(uiExclusionMask, c_invalid, i);
         }
         else
         {
@@ -218,15 +225,23 @@ void wordler::step(GuessSession& session, WordHash guessedWord)
         }
     }
 
-    uint32_t uiFoatingGuessMask = 0;
+    uint32_t uiFoatingGuessMask = c_invalid << (0 * 5) |
+        c_invalid << (1 * 5) |
+        c_invalid << (2 * 5) |
+        c_invalid << (3 * 5) |
+        c_invalid << (4 * 5);
     uint32_t mutableFloatingTarget = session.m_uiTargetWord;
     for (int i = 0; i < 5; i++)
     {
-        const uint32_t guessLetter = reduceSlot(guessedWord, i);
+        const uint32_t guessLetter = reduceSlot(uiExclusionMask, i);
+        if (guessLetter == c_invalid)
+        {
+            continue;
+        }
 
         for (int j = 0; j < 5; j++)
         {
-            if (reduceSlot(session.m_uiCurrentInclusionMask, j) != 0)
+            if (reduceSlot(session.m_uiCurrentInclusionMask, j) != c_invalid)
             {
                 continue;
             }
@@ -236,6 +251,8 @@ void wordler::step(GuessSession& session, WordHash guessedWord)
             {
                 setSlot(uiFoatingGuessMask, guessLetter, i);
                 setSlot(mutableFloatingTarget, 0, j);
+                setSlot(uiExclusionMask, c_invalid, i);
+                break;
             }
         }
     }
@@ -250,26 +267,34 @@ void wordler::step(GuessSession& session, WordHash guessedWord)
             {
                 uint32_t hashCell = reduceSlot(hash, i);
                 uint32_t inclusionCell = reduceSlot(uiInclusionMask, i);
-                if (inclusionCell != 0 && hashCell != inclusionCell)
+                if (inclusionCell != c_invalid && hashCell != inclusionCell)
                 {
                     return true;
                 }
 
-                if (hashCell == reduceSlot(uiExclusionMask, i))
+                for (int j = 0; j < 5; j++)
                 {
-                    return true;
+                    if (inclusionCell == c_invalid && hashCell == reduceSlot(uiExclusionMask, j))
+                    {
+                        return true;
+                    }
                 }
 
                 uint32_t floatingLetter = reduceSlot(uiFoatingGuessMask, i);
-                if (floatingLetter == 0)
+                if (floatingLetter == c_invalid)
                 {
                     continue;
+                }
+
+                if (floatingLetter == hashCell)
+                {
+                    return true;
                 }
 
                 bool bFound = false;
                 for (int j = 0; j < 5; j++)
                 {
-                    if (reduceSlot(uiInclusionMask, j) != 0)
+                    if (reduceSlot(uiInclusionMask, j) != c_invalid)
                     {
                         continue;
                     }
