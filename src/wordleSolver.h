@@ -16,6 +16,7 @@ namespace wordler
     };
 
     void initialize(const char* szFilePath);
+    void initialize(const char** pSzWords, int count);
 
     WordHash composeWord(const std::string& str);
     std::string decomposeWord(WordHash hash);
@@ -24,6 +25,6 @@ namespace wordler
     WordHash pickRandomWord(GuessSession& session);
     WordHash getRecommendedSeedWord();
 
-    GuessSession beginGuessSession();
+    GuessSession beginGuessSession(bool bUseRawList);
     void step(GuessSession& session, WordHash guessedWord);
 }

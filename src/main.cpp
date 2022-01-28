@@ -1,6 +1,7 @@
 #include "wordleSolver.h"
 #include <iostream>
 #include <chrono>
+#include <omp.h>
 
 #define PRINT_STEPS 0
 
@@ -36,10 +37,13 @@ int main()
     int totalSolveStepCount = 0;
 
     auto start = std::chrono::high_resolution_clock::now();
+
+    omp_set_num_threads(16);
+    #pragma omp parallel for num_threads(16)
     for (int i = 0; i < c_iterations; i++)
     {
         wordler::WordHash uiWord = wordler::getRecommendedSeedWord();
-        wordler::GuessSession session = wordler::beginGuessSession();
+        wordler::GuessSession session = wordler::beginGuessSession(false);
 
         #if PRINT_STEPS
         std::cout << "Random word is: " << wordler::decomposeWord(session.m_uiTargetWord) << "\n";
@@ -78,7 +82,7 @@ int main()
         #if PRINT_STEPS
         std::cout << "Found " << wordler::decomposeWord(session.m_vWordList[0]) << " after " << step << " steps!\n";
         #endif
-    }
+}
     auto end = std::chrono::high_resolution_clock::now();
 
     std::cout << 

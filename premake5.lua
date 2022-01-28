@@ -16,16 +16,12 @@ workspace "WordleSolver"
 		intrinsics "on"
 	filter{}
 
-project "WordleSolver"
-	kind "ConsoleApp"
-	location "build/WordleSolver"
+function describeWordle()
 	language "C++"
 	editandcontinue "On"
 	debugdir "$(TargetDir)"
 	files { 
-		".editorconfig",
-		"data/**",
-		"src/**"
+		"src/**.h"
 	}
 	postbuildcommands {
 		'robocopy "' .. path.getabsolute("data") .. '" "$(TargetDir)data" /E',
@@ -52,5 +48,25 @@ project "WordleSolver"
 		["data/platform/*"] = "data/console/**",
 	}
 	flags { "MultiProcessorCompile" }
+end
+
+project "WordleSolver"
+	kind "ConsoleApp"
+	location "build/WordleSolver"
+	files { 
+		"src/main.cpp",
+		"src/wordleSolver.cpp",
+	}
+	describeWordle()
+	
+project "WordleSolverDLL"
+	kind "SharedLib"
+	location "build/WordleSolver"
+	removefiles { "src/main.cpp" }
+	files { 
+		"src/dllmain.cpp",
+		"src/wordleSolver.cpp",
+	}
+	describeWordle()
 
 dofile("third_party/eastl.lua")

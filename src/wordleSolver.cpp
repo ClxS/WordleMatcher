@@ -11,6 +11,7 @@
 
 #define VALIDATION_CHECKS 0
 
+static eastl::vector<std::string> gs_rawWords;
 static eastl::vector<wordler::WordHash> gs_words;
 static wordler::WordHash gs_defaultWord = wordler::composeWord("irate");
 
@@ -155,6 +156,7 @@ void wordler::initialize(const char* szFilePath)
     for (std::string line; std::getline(input, line); )
     {
         gs_words.push_back(composeWord(line));
+        gs_rawWords.push_back(line);
 
         #if VALIDATION_CHECKS
         std::string word = decomposeWord(gs_words.back());
@@ -165,6 +167,23 @@ void wordler::initialize(const char* szFilePath)
     std::sort(gs_words.begin(), gs_words.end(), [](uint32_t a, uint32_t b) {
         return scoreWord(a) > scoreWord(b);
     });
+
+    srand(time(NULL));
+}
+
+
+void wordler::initialize(const char** pSzWords, int count)
+{
+    for (int i = 0; i < count; ++i)
+    {
+        std::string line(pSzWords[i]);
+        gs_words.push_back(composeWord(line));
+        gs_rawWords.push_back(line);
+    }
+
+    std::sort(gs_words.begin(), gs_words.end(), [](uint32_t a, uint32_t b) {
+        return scoreWord(a) > scoreWord(b);
+              });
 
     srand(time(NULL));
 }
@@ -186,10 +205,22 @@ wordler::WordHash wordler::pickRandomWord(GuessSession& session)
     return session.m_vWordList[0];
 }
 
-wordler::GuessSession wordler::beginGuessSession()
+wordler::GuessSession wordler::beginGuessSession(bool bUseRawList)
 {
     GuessSession session;
-    session.m_vWordList = gs_words;
+
+    if (bUseRawList)
+    {
+        for (auto& word : gs_rawWords)
+        {
+            session.m_vWordList.push_back(composeWord(word));
+        }
+    }
+    else
+    {
+        session.m_vWordList = gs_words;
+    }
+
     session.m_uiTargetWord = wordler::pickRandomWord();
     session.m_uiCurrentInclusionMask =
         c_invalid << (0 * 5) |
